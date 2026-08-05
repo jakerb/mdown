@@ -2,6 +2,10 @@
 
 Mdown is a focused, native-feeling Markdown editor for macOS. It pairs Monaco's fast editor with a simple, optional preview so writing stays at the centre of the app.
 
+## Download
+
+Download the current macOS installers from the [Mdown Releases page](https://github.com/jakerb/mdown/releases): choose **Apple Silicon** for M-series Macs or **Intel** for older Intel-based Macs.
+
 ## Features
 
 - Open and edit Markdown files in dedicated windows.
