@@ -88,6 +88,20 @@ function sendToFocused(channel, ...args) {
   if (window && !window.isDestroyed()) window.webContents.send(channel, ...args);
 }
 
+async function openExternalLink(rawUrl) {
+  let url;
+  try { url = new URL(rawUrl); }
+  catch { return false; }
+  if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) return false;
+  await shell.openExternal(url.href);
+  return true;
+}
+
+async function welcomeFile() {
+  const filePath = path.join(__dirname, '..', 'welcome.md');
+  return { path: null, name: 'Welcome.md', content: await fs.readFile(filePath, 'utf8') };
+}
+
 function createWindow(file = null, showWelcome = BrowserWindow.getAllWindows().length === 0) {
   const window = new BrowserWindow({
     width: 1340,
@@ -106,9 +120,21 @@ function createWindow(file = null, showWelcome = BrowserWindow.getAllWindows().l
   mainWindow = window;
   window.isDocumentDirty = false;
   window.documentName = file?.name || 'Untitled.md';
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    openExternalLink(url).catch(() => {});
+    return { action: 'deny' };
+  });
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url === window.webContents.getURL()) return;
+    event.preventDefault();
+    openExternalLink(url).catch(() => {});
+  });
   window.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  if (file) window.webContents.once('did-finish-load', () => window.webContents.send('file:opened', file));
-  if (!file && !showWelcome) window.webContents.once('did-finish-load', () => window.webContents.send('menu:blank-document'));
+  window.webContents.once('did-finish-load', async () => {
+    if (file) window.webContents.send('file:opened', file);
+    else if (showWelcome) window.webContents.send('file:opened', await welcomeFile());
+    else window.webContents.send('menu:blank-document');
+  });
   window.on('close', (event) => {
     if (!window.isDocumentDirty || window.allowClose) return;
     const choice = dialog.showMessageBoxSync(window, {
@@ -191,6 +217,7 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 ipcMain.handle('file:open', (event) => openMarkdownFile(BrowserWindow.fromWebContents(event.sender)));
 ipcMain.handle('file:save', saveMarkdownFile);
 ipcMain.handle('file:reveal', (_event, filePath) => shell.showItemInFolder(filePath));
+ipcMain.handle('shell:open-external', (_event, url) => openExternalLink(url));
 ipcMain.handle('config:get', publicConfig);
 ipcMain.handle('config:save', (_event, config) => saveConfig(config));
 ipcMain.handle('config:set-font-size', (_event, fontSize) => saveConfig({ fontSize }));

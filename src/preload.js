@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('mdown', {
   openFile: () => ipcRenderer.invoke('file:open'),
   saveFile: (payload) => ipcRenderer.invoke('file:save', payload),
   revealFile: (filePath) => ipcRenderer.invoke('file:reveal', filePath),
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   getConfig: () => ipcRenderer.invoke('config:get'),
   saveConfig: (config) => ipcRenderer.invoke('config:save', config),
   setFontSize: (fontSize) => ipcRenderer.invoke('config:set-font-size', fontSize),

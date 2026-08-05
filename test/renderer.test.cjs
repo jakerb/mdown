@@ -9,6 +9,7 @@ const renderer = fs.readFileSync(path.join(root, 'src/renderer/app.js'), 'utf8')
 const html = fs.readFileSync(path.join(root, 'src/renderer/index.html'), 'utf8');
 const packageConfig = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const main = fs.readFileSync(path.join(root, 'src/main.js'), 'utf8');
+const releaseScript = fs.readFileSync(path.join(root, 'scripts/release.sh'), 'utf8');
 
 test('Markdown renderer parses expected formatting', () => {
   const rendered = marked.parse('# Heading\n\n**bold** and [link](https://example.com)');
@@ -57,6 +58,17 @@ test('macOS icon is a 1024px transparent PNG and is used for packaging', () => {
   assert.match(packageConfig.scripts['package:mac:silicon'], /--arm64/);
 });
 
+test('release script publishes verified Intel and Apple Silicon DMGs', () => {
+  assert.match(releaseScript, /^#!\/usr\/bin\/env bash/);
+  assert.match(releaseScript, /npm test/);
+  assert.match(releaseScript, /npm run package:mac/);
+  assert.match(releaseScript, /git status --porcelain --untracked-files=no/);
+  assert.match(releaseScript, /git push origin main --follow-tags/);
+  assert.match(releaseScript, /gh release create/);
+  assert.match(releaseScript, /Mdown-\$version-x64\.dmg/);
+  assert.match(releaseScript, /Mdown-\$version-arm64\.dmg/);
+});
+
 test('TextEdit layout starts editor-only and Preview is menu-toggleable', () => {
   assert.doesNotMatch(html, /<nav|save-file|open-file/);
   assert.match(renderer, /ui-monospace/);
@@ -79,6 +91,21 @@ test('new and opened documents get their own windows and dirty closes are guarde
   assert.match(main, /menu:save-and-close/);
   assert.match(renderer, /if \(await save\(\)\) window\.mdown\.closeAfterSave\(\)/);
   assert.match(renderer, /setDocumentState\(\{ dirty, name: filename \}\)/);
+});
+
+test('welcome content is loaded from the supplied Markdown file and links open externally', () => {
+  const welcome = fs.readFileSync(path.join(root, 'welcome.md'), 'utf8');
+  assert.match(welcome, /^---/);
+  assert.match(welcome, /\[buy me a coffee\]\(\{\{coffee\}\}\)/);
+  assert.match(main, /function welcomeFile\(\)/);
+  assert.match(main, /path\.join\(__dirname, '\.\.', 'welcome\.md'\)/);
+  assert.match(main, /setWindowOpenHandler/);
+  assert.match(main, /will-navigate/);
+  assert.match(main, /shell:open-external/);
+  assert.match(main, /\['http:', 'https:', 'mailto:'\]/);
+  assert.match(fs.readFileSync(path.join(root, 'src/preload.js'), 'utf8'), /openExternal:/);
+  assert.match(renderer, /document\.addEventListener\('click'/);
+  assert.match(renderer, /window\.mdown\.openExternal\(link\.href\)/);
 });
 
 test('editor defaults are distraction-free and configurable', () => {

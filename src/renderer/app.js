@@ -14,85 +14,9 @@ window.MonacoEnvironment = {
 require.config({ paths: { vs: `${monacoBaseUrl}vs` } });
 // marked.min.js sees the AMD loader and registers itself as the `marked` module.
 require(['vs/editor/editor.main', 'marked'], (monaco, marked) => {
-const welcome = `# Welcome to Mdown
-
-Mdown is a focused Markdown editor for macOS. Your notes remain ordinary \`.md\` files, so they stay portable, readable, and yours.
-
-## Write without getting in the way
-
-Use the editor for distraction-free writing, then choose **View → Toggle Preview** when you want to see the rendered document. Open and save files with the standard macOS File menu.
-
-## AI writing assistant
-
-Add an OpenAI API key through the **AI** button in the bottom bar. The key stays locally in \`~/mdown.config.json\`.
-
-Select text, right-click, and choose:
-
-- **Improve** — tighten clarity, flow, and concision.
-- **Rewrite** — create a fresh version while keeping the meaning.
-- **Prompt…** — open the AI sidebar to ask questions about the selected text or the whole document.
-
-The sidebar keeps a conversation visible for follow-up questions and does not change your text. You can edit prompts—or add your own selection actions—from **Edit → Edit Config…**.
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
-| --- | --- |
-| \`⌘N\` | New window |
-| \`⌘O\` | Open Markdown file |
-| \`⌘S\` | Save |
-| \`⌘⇧S\` | Save As |
-| \`⌘⇧I\` | Toggle AI sidebar |
-| \`⌘⇧P\` | Toggle Preview |
-| \`⌘⇧D\` | Toggle Dark Mode |
-| \`⌘⇧L\` | Toggle Line Numbers |
-| \`⌘+\` / \`⌘-\` | Change editor font size |
-| \`Esc\` | Close the AI sidebar |
-
-## Markdown basics
-
-\`\`\`markdown
-# Heading one
-## Heading two
-
-Write **bold**, *italic*, and \`inline code\`.
-
-- A bullet
-- Another bullet
-
-1. A numbered item
-2. Another item
-
-[A link](https://example.com)
-
-> A useful quotation.
-\`\`\`
-
-## Frontmatter and reusable values
-
-Put a small frontmatter block at the very top of a note, then reuse its values with double braces. Frontmatter is hidden in Preview.
-
-\`\`\`markdown
----
-project: Mdown
-author: Ada
----
-
-# {{project}}
-
-Written by {{author}}.
-\`\`\`
-
-Happy writing.
-
----
-
-If Mdown is useful to you, you can [buy me a coffee](https://buymeacoffee.com/jakebown). Thank you for supporting the project.
-`;
-
 let currentPath = null;
 let isDirty = false;
-let savedContent = welcome;
+let savedContent = '';
 let editorFontSize = 14;
 let lineNumbersVisible = false;
 let spellCheckEnabled = false;
@@ -128,7 +52,7 @@ monaco.editor.defineTheme('mdown-dark', {
 });
 
 const editor = monaco.editor.create(document.getElementById('editor'), {
-  value: welcome,
+  value: '',
   language: 'markdown',
   theme: 'mdown',
   automaticLayout: true,
@@ -420,6 +344,12 @@ document.getElementById('editor').addEventListener('contextmenu', (event) => {
   pendingSelection = selection;
   event.preventDefault();
   window.mdown.showContextMenu({ hasSelection: true });
+});
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a[href]');
+  if (!link) return;
+  event.preventDefault();
+  window.mdown.openExternal(link.href).catch(() => notify('Unable to open link'));
 });
 render();
 setDirty(false);

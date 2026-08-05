@@ -45,6 +45,14 @@ npm run package:mac
 
 The DMGs are written to `dist/` as architecture-specific files.
 
+To test, package, tag, push, and publish a release in one step, first commit any application changes, then run:
+
+```sh
+./scripts/release.sh 1.0.1
+```
+
+The script requires an authenticated GitHub CLI session and publishes the Intel and Apple Silicon DMGs to GitHub Releases.
+
 ## Support the project
 
 If Mdown is useful to you, you can support its development at [Buy Me a Coffee](https://buymeacoffee.com/jakebown).
