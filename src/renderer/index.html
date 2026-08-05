@@ -23,7 +23,13 @@
       </aside>
     </main>
     <footer class="taskbar">
-      <button id="ai-settings" title="AI Settings">AI</button>
+      <div class="taskbar-left">
+        <button id="ai-settings" title="AI Settings">AI</button>
+        <button id="dark-mode-toggle" title="Toggle Dark Mode" aria-label="Toggle Dark Mode" aria-pressed="false">◐</button>
+        <span id="word-count">0 words</span>
+        <span id="character-count">0 characters</span>
+        <span id="writing-time">Writing 0m</span>
+      </div>
       <span id="font-status">14 px</span>
     </footer>
     <section class="settings-modal" id="settings-modal" aria-hidden="true">

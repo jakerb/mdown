@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('mdown', {
   setFontSize: (fontSize) => ipcRenderer.invoke('config:set-font-size', fontSize),
   setDarkMode: (darkMode) => ipcRenderer.invoke('config:set-dark-mode', darkMode),
   setPreviewVisible: (previewVisible) => ipcRenderer.invoke('config:set-preview-visible', previewVisible),
+  addWritingTime: (seconds) => ipcRenderer.invoke('writing-time:add', seconds),
   runAi: (request) => ipcRenderer.invoke('ai:run', request),
   showContextMenu: (options) => ipcRenderer.invoke('context-menu:show', options),
   setSpellCheck: (enabled) => ipcRenderer.invoke('spellcheck:set', enabled),

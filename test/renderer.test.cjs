@@ -29,8 +29,10 @@ test('editor and preview have bidirectional scroll synchronization', () => {
   assert.match(renderer, /function syncPreviewFromEditor\(\)/);
   assert.match(renderer, /function syncEditorFromPreview\(\)/);
   assert.match(renderer, /editor\.onDidScrollChange/);
-  assert.match(renderer, /preview\.addEventListener\('scroll', syncEditorFromPreview/);
-  assert.match(renderer, /editor-pane'\)\.addEventListener\('wheel', schedulePreviewSync/);
+  assert.match(renderer, /const previewPane = \$\('\.preview-pane'\)/);
+  assert.match(renderer, /previewPane\.scrollTop/);
+  assert.match(renderer, /previewPane\.addEventListener\('scroll', syncEditorFromPreview/);
+  assert.match(renderer, /requestAnimationFrame\(syncPreviewFromEditor\)/);
 });
 
 test('renderer loads Marked as an AMD dependency', () => {
@@ -124,10 +126,20 @@ test('editor defaults are distraction-free and configurable', () => {
   assert.match(main, /config:set-dark-mode/);
   assert.match(main, /config:set-preview-visible/);
   assert.match(main, /config:set-font-size/);
+  assert.match(main, /writing-time:add/);
+  assert.match(main, /writingTimeSeconds: 0/);
   assert.match(renderer, /setDarkMode\(config\.darkMode, false\)/);
   assert.match(renderer, /setPreviewVisible\(true, false\)/);
   assert.match(renderer, /setPreviewVisible\(file\.name === 'Welcome\.md' \? true : previewPreference, false\)/);
   assert.match(renderer, /window\.mdown\.setFontSize\(editorFontSize\)/);
+  assert.match(renderer, /function updateDocumentStats\(\)/);
+  assert.match(renderer, /function updateWritingTime\(\)/);
+  assert.match(renderer, /function recordWritingActivity\(\)/);
+  assert.match(renderer, /window\.mdown\.addWritingTime/);
+  assert.match(html, /id="word-count"/);
+  assert.match(html, /id="character-count"/);
+  assert.match(html, /id="writing-time"/);
+  assert.match(html, /id="dark-mode-toggle"/);
   assert.match(main, /Toggle Spell Check/);
   assert.match(main, /Increase Editor Font Size/);
 });
@@ -144,7 +156,7 @@ test('AI settings, selection tools, and secure renderer boundary are wired', () 
   assert.match(main, /api\.openai\.com\/v1\/responses/);
   assert.match(main, /raw Markdown/);
   assert.match(main, /context-menu:show/);
-  assert.match(main, /if \(!hasSelection \|\| !config\.apiKey\) return/);
+  assert.match(main, /if \(!hasSelection\) return/);
   assert.match(renderer, /async function openAi\(\)/);
   assert.match(renderer, /aiConfig = await window\.mdown\.getConfig\(\)/);
   assert.match(main, /label: 'Improve'/);
@@ -154,11 +166,23 @@ test('AI settings, selection tools, and secure renderer boundary are wired', () 
   assert.match(renderer, /onAi\('rewrite'/);
   assert.match(renderer, /onAi\('prompt'/);
   assert.match(renderer, /onAi\('custom'/);
+  assert.match(renderer, /function registerContextActions\(customPromptNames = \[\]\)/);
+  assert.match(renderer, /editor\.addAction/);
+  assert.match(renderer, /contextMenuGroupId: '1_modification'/);
+  assert.match(renderer, /precondition: 'editorHasSelection'/);
+  assert.match(renderer, /registerContextActions\(config\.promptNames \|\| \[\]\)/);
   assert.match(html, /id="ai-sidebar"/);
   assert.match(html, /id="chat-messages"/);
   assert.match(renderer, /action: 'chat'/);
   assert.match(renderer, /chatHistory\.push\(\{ role: 'assistant'/);
-  assert.match(renderer, /chatSelection = pendingSelection \|\| currentSelection\(\)/);
+  assert.match(renderer, /const selectionAtOpen = pendingSelection \|\| currentSelection\(\)/);
+  assert.match(renderer, /chatSelection = selectionAtOpen/);
+  assert.match(renderer, /Using selected text as AI context/);
+  assert.match(renderer, /function setAiWorking\(working\)/);
+  assert.match(renderer, /async function requestAi\(request\)/);
+  assert.match(renderer, /await requestAi\(\{ action: 'chat'/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /\.taskbar button\.ai-working::after/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /@keyframes ai-spinner/);
   assert.match(renderer, /pendingSelection = selection/);
   assert.match(renderer, /function toggleAiChat\(\)/);
   assert.match(renderer, /onMenu\('ai-compose', toggleAiChat\)/);

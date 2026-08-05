@@ -11,7 +11,7 @@ const defaultPrompts = {
   compose: 'Write the requested addition for the Markdown document. Use the document only as context. Return only raw Markdown to insert at the cursor, with no preamble, commentary, or code fence.',
   chat: 'Answer the user’s question about the selected text and document context. Be accurate and concise. Return the answer as raw Markdown, with no preamble or code fence.'
 };
-const defaultConfig = { apiKey: '', model: 'gpt-5', fontSize: 14, darkMode: false, previewVisible: false, googleFont: '', prompts: defaultPrompts };
+const defaultConfig = { apiKey: '', model: 'gpt-5', fontSize: 14, darkMode: false, previewVisible: false, writingTimeSeconds: 0, googleFont: '', prompts: defaultPrompts };
 
 async function readConfig() {
   try {
@@ -29,6 +29,7 @@ async function saveConfig({ apiKey, model, fontSize }) {
     fontSize: Number.isFinite(fontSize) ? Math.max(11, Math.min(26, fontSize)) : existing.fontSize,
     darkMode: existing.darkMode,
     previewVisible: existing.previewVisible,
+    writingTimeSeconds: existing.writingTimeSeconds,
     googleFont: existing.googleFont,
     prompts: existing.prompts
   };
@@ -38,7 +39,8 @@ async function saveConfig({ apiKey, model, fontSize }) {
 
 async function publicConfig() {
   const config = await readConfig();
-  return { configured: Boolean(config.apiKey), model: config.model, fontSize: config.fontSize, darkMode: config.darkMode, previewVisible: config.previewVisible, googleFont: config.googleFont, keyHint: config.apiKey ? `••••${config.apiKey.slice(-4)}` : '' };
+  const promptNames = Object.keys(config.prompts || {}).filter((name) => !['improve', 'rewrite', 'review', 'compose', 'chat'].includes(name));
+  return { configured: Boolean(config.apiKey), model: config.model, fontSize: config.fontSize, darkMode: config.darkMode, previewVisible: config.previewVisible, writingTimeSeconds: config.writingTimeSeconds, googleFont: config.googleFont, promptNames, keyHint: config.apiKey ? `••••${config.apiKey.slice(-4)}` : '' };
 }
 
 async function openConfigFile() {
@@ -231,6 +233,13 @@ ipcMain.handle('config:set-preview-visible', async (_event, previewVisible) => {
   await fs.writeFile(configPath(), `${JSON.stringify({ ...config, previewVisible: Boolean(previewVisible) }, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   return publicConfig();
 });
+ipcMain.handle('writing-time:add', async (_event, seconds) => {
+  const config = await readConfig();
+  const increment = Math.max(0, Math.min(60, Number(seconds) || 0));
+  const writingTimeSeconds = Math.round((Number(config.writingTimeSeconds) || 0) + increment);
+  await fs.writeFile(configPath(), `${JSON.stringify({ ...config, writingTimeSeconds }, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  return writingTimeSeconds;
+});
 ipcMain.handle('ai:run', runAi);
 ipcMain.handle('spellcheck:set', (event, enabled) => event.sender.session.setSpellCheckerEnabled(Boolean(enabled)));
 ipcMain.on('document:state', (event, { dirty, name }) => {
@@ -243,7 +252,7 @@ ipcMain.on('document:close-after-save', (event) => {
 });
 ipcMain.handle('context-menu:show', async (event, { hasSelection }) => {
   const config = await readConfig();
-  if (!hasSelection || !config.apiKey) return;
+  if (!hasSelection) return;
   const customPrompts = Object.keys(config.prompts || {})
     .filter((name) => !['improve', 'rewrite', 'review', 'compose', 'chat'].includes(name))
     .map((name) => ({ label: name.replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()), click: () => event.sender.send('ai:custom', name) }));

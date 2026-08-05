@@ -86,6 +86,7 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
 
 const $ = (selector) => document.querySelector(selector);
 const preview = $('#preview');
+const previewPane = $('.preview-pane');
 const toast = $('#toast');
 const aiSidebar = $('#ai-sidebar');
 const chatMessages = $('#chat-messages');
@@ -95,6 +96,12 @@ const aiPrompt = $('#ai-prompt');
 let filename = 'Welcome.md';
 let syncingEditorScroll = false;
 let syncingPreviewScroll = false;
+let contextActionDisposables = [];
+let activeAiRequests = 0;
+let totalWritingSeconds = 0;
+let unsavedWritingSeconds = 0;
+let writingActivityUntil = 0;
+let lastWritingTick = Date.now();
 
 marked.use({ gfm: true, breaks: true });
 function parseFrontmatter(source) {
@@ -112,19 +119,20 @@ function render() {
   const { values, body } = parseFrontmatter(editor.getValue());
   const resolved = body.replace(/\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}/g, (placeholder, key) => values[key] ?? placeholder);
   preview.innerHTML = marked.parse(resolved);
+  requestAnimationFrame(syncPreviewFromEditor);
 }
 function editorScrollRange() { return Math.max(0, editor.getScrollHeight() - editor.getLayoutInfo().height); }
-function previewScrollRange() { return Math.max(0, preview.scrollHeight - preview.clientHeight); }
+function previewScrollRange() { return Math.max(0, previewPane.scrollHeight - previewPane.clientHeight); }
 function syncPreviewFromEditor() {
   if (syncingPreviewScroll || !previewScrollRange() || !editorScrollRange()) return;
   syncingEditorScroll = true;
-  preview.scrollTop = (editor.getScrollTop() / editorScrollRange()) * previewScrollRange();
+  previewPane.scrollTop = (editor.getScrollTop() / editorScrollRange()) * previewScrollRange();
   requestAnimationFrame(() => { syncingEditorScroll = false; });
 }
 function syncEditorFromPreview() {
   if (syncingEditorScroll || !previewScrollRange() || !editorScrollRange()) return;
   syncingPreviewScroll = true;
-  editor.setScrollTop((preview.scrollTop / previewScrollRange()) * editorScrollRange());
+  editor.setScrollTop((previewPane.scrollTop / previewScrollRange()) * editorScrollRange());
   requestAnimationFrame(() => { syncingPreviewScroll = false; });
 }
 function setDirty(dirty) {
@@ -138,6 +146,17 @@ function notify(message) {
   toast.classList.add('show');
   window.clearTimeout(notify.timer);
   notify.timer = window.setTimeout(() => toast.classList.remove('show'), 2200);
+}
+function setAiWorking(working) {
+  activeAiRequests = Math.max(0, activeAiRequests + (working ? 1 : -1));
+  const aiButton = $('#ai-settings');
+  aiButton.classList.toggle('ai-working', activeAiRequests > 0);
+  aiButton.setAttribute('aria-busy', String(activeAiRequests > 0));
+}
+async function requestAi(request) {
+  setAiWorking(true);
+  try { return await window.mdown.runAi(request); }
+  finally { setAiWorking(false); }
 }
 function setModal(modal, open) { modal.classList.toggle('open', open); modal.setAttribute('aria-hidden', String(!open)); }
 function setPreviewVisible(open, persist = true) {
@@ -184,6 +203,8 @@ function toggleLineNumbers() {
 function setDarkMode(enabled, persist = true) {
   darkMode = Boolean(enabled);
   document.body.classList.toggle('dark-mode', darkMode);
+  $('#dark-mode-toggle').setAttribute('aria-pressed', String(darkMode));
+  $('#dark-mode-toggle').title = darkMode ? 'Use Light Mode' : 'Use Dark Mode';
   monaco.editor.setTheme(darkMode ? 'mdown-dark' : 'mdown');
   if (persist) window.mdown.setDarkMode(darkMode).then((config) => { aiConfig = config; }).catch(() => notify('Unable to save dark mode'));
 }
@@ -191,6 +212,36 @@ function toggleDarkMode() {
   setDarkMode(!darkMode);
   notify(`Dark mode ${darkMode ? 'on' : 'off'}`);
 }
+function updateDocumentStats() {
+  const content = editor.getValue();
+  const words = content.trim().match(/\S+/g)?.length || 0;
+  $('#word-count').textContent = `${words.toLocaleString()} ${words === 1 ? 'word' : 'words'}`;
+  const characters = Array.from(content).length;
+  $('#character-count').textContent = `${characters.toLocaleString()} ${characters === 1 ? 'character' : 'characters'}`;
+}
+function updateWritingTime() {
+  const seconds = Math.round(totalWritingSeconds);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  $('#writing-time').textContent = hours ? `Writing ${hours}h ${minutes}m` : `Writing ${minutes}m ${remainder}s`;
+}
+function recordWritingActivity() { writingActivityUntil = Date.now() + 10000; }
+window.setInterval(() => {
+  const now = Date.now();
+  const elapsed = Math.min(2, (now - lastWritingTick) / 1000);
+  lastWritingTick = now;
+  if (document.hasFocus() && now < writingActivityUntil) {
+    totalWritingSeconds += elapsed;
+    unsavedWritingSeconds += elapsed;
+    updateWritingTime();
+    if (unsavedWritingSeconds >= 5) {
+      const increment = unsavedWritingSeconds;
+      unsavedWritingSeconds = 0;
+      window.mdown.addWritingTime(increment).catch(() => { unsavedWritingSeconds += increment; });
+    }
+  }
+}, 1000);
 async function toggleSpellCheck() {
   spellCheckEnabled = !spellCheckEnabled;
   await window.mdown.setSpellCheck(spellCheckEnabled);
@@ -202,9 +253,17 @@ function currentSelection() {
   return { range: selection, text };
 }
 async function openAi() {
+  // Capture before awaiting IPC: opening a native menu/sidebar can otherwise
+  // move focus away from Monaco and lose the active selection.
+  const selectionAtOpen = pendingSelection || currentSelection();
   aiConfig = await window.mdown.getConfig();
-  if (!aiConfig.configured) { openSettings(); notify('Add an OpenAI API key to use AI writing tools'); return; }
-  chatSelection = pendingSelection || currentSelection();
+  if (!aiConfig.configured) {
+    pendingSelection = selectionAtOpen;
+    openSettings();
+    notify('Add an OpenAI API key to use AI writing tools');
+    return;
+  }
+  chatSelection = selectionAtOpen;
   pendingSelection = null;
   chatHistory = [];
   renderChat();
@@ -212,13 +271,14 @@ async function openAi() {
   aiPrompt.placeholder = 'How can I help? (Esc to hide)';
   setChatVisible(true);
   aiPrompt.focus();
+  if (chatSelection.text.trim()) notify('Using selected text as AI context');
 }
 function toggleAiChat() {
   if (document.body.classList.contains('chat-visible')) { setChatVisible(false); editor.focus(); }
   else openAi();
 }
 async function runAiAction(action, selection, instruction = '') {
-  const result = await window.mdown.runAi({ action, selection: selection.text, instruction, document: editor.getValue() });
+  const result = await requestAi({ action, selection: selection.text, instruction, document: editor.getValue() });
   const originalRange = selection.range || editor.getSelection();
   const hasSelection = selection.text.trim().length > 0;
   const range = action === 'compose' && originalRange && !hasSelection
@@ -239,7 +299,7 @@ async function submitAi() {
   aiPrompt.value = ''; renderChat();
   chatComposer.classList.add('busy'); aiPrompt.disabled = true;
   try {
-    const response = await window.mdown.runAi({ action: 'chat', selection: selection.text, instruction, document: editor.getValue(), history: chatHistory.slice(0, -1) });
+    const response = await requestAi({ action: 'chat', selection: selection.text, instruction, document: editor.getValue(), history: chatHistory.slice(0, -1) });
     chatHistory.push({ role: 'assistant', content: response }); renderChat();
   } catch (error) { chatHistory.push({ role: 'assistant', content: `**Error:** ${error.message || 'Unable to complete request.'}` }); renderChat(); }
   finally { chatComposer.classList.remove('busy'); aiPrompt.disabled = false; aiPrompt.focus(); }
@@ -250,6 +310,29 @@ async function replaceSelectedText(action) {
   if (!selection.text.trim()) return;
   try { await runAiAction(action, selection); }
   catch (error) { notify(error.message || 'Unable to revise text'); }
+}
+function promptLabel(name) {
+  return name.replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+function runContextAction(action) {
+  pendingSelection = currentSelection();
+  return action === 'prompt' ? openAi() : replaceSelectedText(action);
+}
+function registerContextActions(customPromptNames = []) {
+  for (const disposable of contextActionDisposables) disposable.dispose();
+  contextActionDisposables = [
+    ['improve', 'Improve'],
+    ['rewrite', 'Rewrite'],
+    ['prompt', 'Prompt…'],
+    ...customPromptNames.map((name) => [name, promptLabel(name)])
+  ].map(([action, label], index) => editor.addAction({
+    id: `mdown.${action}`,
+    label,
+    precondition: 'editorHasSelection',
+    contextMenuGroupId: '1_modification',
+    contextMenuOrder: 1 + index / 10,
+    run: () => runContextAction(action)
+  }));
 }
 async function openSettings() {
   aiConfig = await window.mdown.getConfig();
@@ -303,13 +386,10 @@ async function save(forceNew = false) {
   return true;
 }
 
-editor.onDidChangeModelContent(() => { render(); setDirty(editor.getValue() !== savedContent); });
+editor.onDidChangeModelContent(() => { render(); updateDocumentStats(); recordWritingActivity(); setDirty(editor.getValue() !== savedContent); });
 function schedulePreviewSync() { requestAnimationFrame(syncPreviewFromEditor); }
-function scheduleEditorSync() { requestAnimationFrame(syncEditorFromPreview); }
 editor.onDidScrollChange((event) => { if (event.scrollTopChanged) schedulePreviewSync(); });
-document.querySelector('.editor-pane').addEventListener('wheel', schedulePreviewSync, { passive: true });
-preview.addEventListener('scroll', syncEditorFromPreview, { passive: true });
-preview.addEventListener('wheel', scheduleEditorSync, { passive: true });
+previewPane.addEventListener('scroll', syncEditorFromPreview, { passive: true });
 window.mdown.onOpen(displayFile);
 window.mdown.onMenu('new', newNote);
 window.mdown.onMenu('blank-document', newBlankNote);
@@ -329,6 +409,7 @@ window.mdown.onAi('rewrite', () => replaceSelectedText('rewrite'));
 window.mdown.onAi('prompt', openAi);
 window.mdown.onAi('custom', (action) => replaceSelectedText(action));
 $('#ai-settings').addEventListener('click', openSettings);
+$('#dark-mode-toggle').addEventListener('click', toggleDarkMode);
 $('#close-ai').addEventListener('click', () => { setChatVisible(false); editor.focus(); });
 $('#close-settings').addEventListener('click', () => setModal(settingsModal, false));
 $('#save-settings').addEventListener('click', saveSettings);
@@ -338,13 +419,6 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault(); setChatVisible(false); editor.focus();
   }
 });
-document.getElementById('editor').addEventListener('contextmenu', (event) => {
-  const selection = currentSelection();
-  if (!selection.text.trim()) return;
-  pendingSelection = selection;
-  event.preventDefault();
-  window.mdown.showContextMenu({ hasSelection: true });
-});
 document.addEventListener('click', (event) => {
   const link = event.target.closest('a[href]');
   if (!link) return;
@@ -352,13 +426,19 @@ document.addEventListener('click', (event) => {
   window.mdown.openExternal(link.href).catch(() => notify('Unable to open link'));
 });
 render();
+registerContextActions();
+updateDocumentStats();
+updateWritingTime();
 setDirty(false);
 setPreviewVisible(true, false);
 applyFontSize(14, false);
 window.mdown.setSpellCheck(false);
 window.mdown.getConfig().then((config) => {
   aiConfig = config;
+  registerContextActions(config.promptNames || []);
   previewPreference = Boolean(config.previewVisible);
+  totalWritingSeconds = Number(config.writingTimeSeconds) || 0;
+  updateWritingTime();
   if (filename !== 'Welcome.md') setPreviewVisible(previewPreference, false);
   applyFontSize(config.fontSize || 14, false);
   applyGoogleFont(config.googleFont || '');
