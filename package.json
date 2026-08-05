@@ -1,0 +1,36 @@
+{
+  "name": "mdown",
+  "version": "1.0.0",
+  "description": "A calm, native-feeling Markdown notebook for macOS.",
+  "author": "Jake Bown",
+  "main": "src/main.js",
+  "scripts": {
+    "test": "node --test test/*.test.cjs",
+    "prepackage:mac": "npm test",
+    "start": "electron .",
+    "dev": "electron .",
+    "package:mac": "npm run package:mac:intel && npm run package:mac:silicon",
+    "package:mac:intel": "electron-builder --mac dmg --x64",
+    "package:mac:silicon": "electron-builder --mac dmg --arm64"
+  },
+  "build": {
+    "appId": "com.mdown.app",
+    "productName": "Mdown",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "mac": {
+      "icon": "icon.png",
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^37.2.5",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "marked": "^15.0.12",
+    "monaco-editor": "^0.52.2"
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mdown</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="workspace">
+      <div class="drag-strip" aria-hidden="true"></div>
+      <div class="window-title" id="window-title">Welcome.md</div>
+      <section class="editor-pane">
+          <div id="editor"></div>
+        </section>
+      <section class="preview-pane">
+          <article id="preview" class="markdown-body"></article>
+      </section>
+      <aside class="ai-sidebar" id="ai-sidebar" aria-hidden="true">
+        <header class="ai-sidebar-header"><strong>AI</strong><button id="close-ai" aria-label="Close AI sidebar">×</button></header>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-composer" id="chat-composer"><div class="ai-input-wrap"><textarea id="ai-prompt" rows="1" placeholder="How can I help? (Esc to hide)"></textarea></div></div>
+      </aside>
+    </main>
+    <footer class="taskbar">
+      <button id="ai-settings" title="AI Settings">AI</button>
+      <span id="font-status">14 px</span>
+    </footer>
+    <section class="settings-modal" id="settings-modal" aria-hidden="true">
+      <div class="settings-sheet">
+        <div class="ai-sheet-head"><strong>AI Settings</strong><button class="close-modal" id="close-settings" aria-label="Close">×</button></div>
+        <label>OpenAI API key<input id="api-key" type="password" autocomplete="off" placeholder="sk-…" /></label>
+        <label>Model<select id="ai-model"><option value="gpt-5">GPT-5</option><option value="gpt-5-mini">GPT-5 mini</option><option value="gpt-4.1">GPT-4.1</option></select></label>
+        <p class="settings-note" id="key-hint">Your key is stored locally in ~/mdown.config.json.</p>
+        <button id="save-settings">Save Settings</button>
+      </div>
+    </section>
+    <div class="toast" id="toast"></div>
+    <!-- Monaco's AMD build is intentionally used here: it can load Monaco's CSS and workers directly in Electron without a bundler. -->
+    <script src="../../node_modules/monaco-editor/min/vs/loader.js"></script>
+    <script src="../../node_modules/marked/marked.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

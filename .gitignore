@@ -1,0 +1,11 @@
+# Dependencies and generated releases
+node_modules/
+dist/
+
+# Local macOS and development files
+.DS_Store
+*.log
+npm-debug.log*
+
+# Per-user Mdown settings, which can contain an AI API key
+mdown.config.json
