@@ -1,6 +1,6 @@
 {
   "name": "mdown",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A calm, native-feeling Markdown notebook for macOS.",
   "author": "Jake Bown",
   "main": "src/main.js",
