@@ -98,6 +98,7 @@ let syncingEditorScroll = false;
 let syncingPreviewScroll = false;
 let contextActionDisposables = [];
 let activeAiRequests = 0;
+let aiMode = 'edit';
 let totalWritingSeconds = 0;
 let unsavedWritingSeconds = 0;
 let writingActivityUntil = 0;
@@ -169,6 +170,11 @@ function setPreviewVisible(open, persist = true) {
 }
 function togglePreview() { setPreviewVisible(!previewVisible); }
 function setChatVisible(open) { document.body.classList.toggle('chat-visible', open); aiSidebar.setAttribute('aria-hidden', String(!open)); }
+function setAiMode(mode) {
+  aiMode = mode === 'edit' ? 'edit' : 'chat';
+  document.querySelectorAll('[data-ai-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.aiMode === aiMode)));
+  aiPrompt.placeholder = aiMode === 'edit' ? 'Describe the edit to make… (Esc to hide)' : 'How can I help? (Esc to hide)';
+}
 function escapeHtml(value) { return value.replace(/[&<>"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[character]); }
 function renderChat() {
   chatMessages.innerHTML = chatHistory.map((message) => `<article class="chat-message ${message.role}">${message.role === 'assistant' ? marked.parse(message.content) : `<p>${escapeHtml(message.content)}</p>`}</article>`).join('');
@@ -268,7 +274,7 @@ async function openAi() {
   chatHistory = [];
   renderChat();
   aiPrompt.value = '';
-  aiPrompt.placeholder = 'How can I help? (Esc to hide)';
+  setAiMode('edit');
   setChatVisible(true);
   aiPrompt.focus();
   if (chatSelection.text.trim()) notify('Using selected text as AI context');
@@ -299,8 +305,21 @@ async function submitAi() {
   aiPrompt.value = ''; renderChat();
   chatComposer.classList.add('busy'); aiPrompt.disabled = true;
   try {
-    const response = await requestAi({ action: 'chat', selection: selection.text, instruction, document: editor.getValue(), history: chatHistory.slice(0, -1) });
-    chatHistory.push({ role: 'assistant', content: response }); renderChat();
+    if (aiMode === 'edit') {
+      const action = selection.text.trim() ? 'review' : 'compose';
+      const response = await requestAi({ action, selection: selection.text, instruction, document: editor.getValue() });
+      const range = selection.range || editor.getSelection();
+      if (!range) throw new Error('Place the cursor where you want the text inserted.');
+      const model = editor.getModel();
+      const startOffset = model.getOffsetAt(range.getStartPosition());
+      editor.executeEdits('mdown-ai-sidebar', [{ range, text: response, forceMoveMarkers: true }]);
+      const endPosition = model.getPositionAt(startOffset + response.length);
+      editor.setSelection(new monaco.Selection(range.startLineNumber, range.startColumn, endPosition.lineNumber, endPosition.column));
+      chatHistory.push({ role: 'assistant', content: 'Applied to the editor.' }); renderChat();
+    } else {
+      const response = await requestAi({ action: 'chat', selection: selection.text, instruction, document: editor.getValue(), history: chatHistory.slice(0, -1) });
+      chatHistory.push({ role: 'assistant', content: response }); renderChat();
+    }
   } catch (error) { chatHistory.push({ role: 'assistant', content: `**Error:** ${error.message || 'Unable to complete request.'}` }); renderChat(); }
   finally { chatComposer.classList.remove('busy'); aiPrompt.disabled = false; aiPrompt.focus(); }
 }
@@ -410,6 +429,7 @@ window.mdown.onAi('prompt', openAi);
 window.mdown.onAi('custom', (action) => replaceSelectedText(action));
 $('#ai-settings').addEventListener('click', openSettings);
 $('#dark-mode-toggle').addEventListener('click', toggleDarkMode);
+document.querySelectorAll('[data-ai-mode]').forEach((button) => button.addEventListener('click', () => setAiMode(button.dataset.aiMode)));
 $('#close-ai').addEventListener('click', () => { setChatVisible(false); editor.focus(); });
 $('#close-settings').addEventListener('click', () => setModal(settingsModal, false));
 $('#save-settings').addEventListener('click', saveSettings);

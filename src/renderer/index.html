@@ -17,9 +17,9 @@
           <article id="preview" class="markdown-body"></article>
       </section>
       <aside class="ai-sidebar" id="ai-sidebar" aria-hidden="true">
-        <header class="ai-sidebar-header"><strong>AI</strong><button id="close-ai" aria-label="Close AI sidebar">×</button></header>
+        <header class="ai-sidebar-header"><strong>AI</strong><div class="ai-mode-toggle" role="group" aria-label="AI mode"><button data-ai-mode="chat" aria-pressed="false">Ask</button><button data-ai-mode="edit" aria-pressed="true">Edit</button></div><button id="close-ai" aria-label="Close AI sidebar">×</button></header>
         <div class="chat-messages" id="chat-messages"></div>
-        <div class="chat-composer" id="chat-composer"><div class="ai-input-wrap"><textarea id="ai-prompt" rows="1" placeholder="How can I help? (Esc to hide)"></textarea></div></div>
+        <div class="chat-composer" id="chat-composer"><div class="ai-input-wrap"><textarea id="ai-prompt" rows="1" placeholder="Describe the edit to make… (Esc to hide)"></textarea></div></div>
       </aside>
     </main>
     <footer class="taskbar">

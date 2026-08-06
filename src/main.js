@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 let mainWindow;
+let showWelcomeOnLaunch = true;
 const configPath = () => path.join(app.getPath('home'), 'mdown.config.json');
 const defaultPrompts = {
   improve: 'Improve the selected text for clarity, flow, and concision. Preserve its voice, facts, formatting, and intent. Return only the revised text as raw Markdown. Never add commentary or wrap the response in a code fence.',
@@ -11,7 +12,7 @@ const defaultPrompts = {
   compose: 'Write the requested addition for the Markdown document. Use the document only as context. Return only raw Markdown to insert at the cursor, with no preamble, commentary, or code fence.',
   chat: 'Answer the user’s question about the selected text and document context. Be accurate and concise. Return the answer as raw Markdown, with no preamble or code fence.'
 };
-const defaultConfig = { apiKey: '', model: 'gpt-5', fontSize: 14, darkMode: false, previewVisible: false, writingTimeSeconds: 0, googleFont: '', prompts: defaultPrompts };
+const defaultConfig = { apiKey: '', model: 'gpt-5', fontSize: 14, darkMode: false, previewVisible: false, showWelcomeOnLaunch: true, writingTimeSeconds: 0, googleFont: '', prompts: defaultPrompts };
 
 async function readConfig() {
   try {
@@ -29,6 +30,7 @@ async function saveConfig({ apiKey, model, fontSize }) {
     fontSize: Number.isFinite(fontSize) ? Math.max(11, Math.min(26, fontSize)) : existing.fontSize,
     darkMode: existing.darkMode,
     previewVisible: existing.previewVisible,
+    showWelcomeOnLaunch: existing.showWelcomeOnLaunch,
     writingTimeSeconds: existing.writingTimeSeconds,
     googleFont: existing.googleFont,
     prompts: existing.prompts
@@ -104,7 +106,7 @@ async function welcomeFile() {
   return { path: null, name: 'Welcome.md', content: await fs.readFile(filePath, 'utf8') };
 }
 
-function createWindow(file = null, showWelcome = BrowserWindow.getAllWindows().length === 0) {
+function createWindow(file = null, showWelcome = showWelcomeOnLaunch && BrowserWindow.getAllWindows().length === 0) {
   const window = new BrowserWindow({
     width: 1340,
     height: 820,
@@ -177,7 +179,8 @@ async function saveMarkdownFile(_event, { filePath, content }) {
   return { path: targetPath, name: path.basename(targetPath) };
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  showWelcomeOnLaunch = (await readConfig()).showWelcomeOnLaunch !== false;
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { role: 'appMenu' },
     { label: 'File', submenu: [
@@ -209,7 +212,14 @@ app.whenReady().then(() => {
       { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
       { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }
     ] },
-    { role: 'windowMenu' }
+    { label: 'Window', submenu: [
+      { label: 'Show Welcome on Launch', type: 'checkbox', checked: showWelcomeOnLaunch, click: async (item) => {
+        showWelcomeOnLaunch = item.checked;
+        const config = await readConfig();
+        await fs.writeFile(configPath(), `${JSON.stringify({ ...config, showWelcomeOnLaunch }, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+      } },
+      { type: 'separator' }, { role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }
+    ] }
   ]));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

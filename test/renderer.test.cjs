@@ -87,7 +87,9 @@ test('TextEdit layout starts editor-only and Preview is menu-toggleable', () => 
 test('new and opened documents get their own windows and dirty closes are guarded', () => {
   assert.match(main, /click: \(\) => createWindow\(\)/);
   assert.match(main, /if \(file\) createWindow\(file\)/);
-  assert.match(main, /showWelcome = BrowserWindow\.getAllWindows\(\)\.length === 0/);
+  assert.match(main, /showWelcome = showWelcomeOnLaunch && BrowserWindow\.getAllWindows\(\)\.length === 0/);
+  assert.match(main, /Show Welcome on Launch/);
+  assert.match(main, /showWelcomeOnLaunch: true/);
   assert.match(main, /menu:blank-document/);
   assert.match(main, /Save changes to/);
   assert.match(main, /menu:save-and-close/);
@@ -173,7 +175,15 @@ test('AI settings, selection tools, and secure renderer boundary are wired', () 
   assert.match(renderer, /registerContextActions\(config\.promptNames \|\| \[\]\)/);
   assert.match(html, /id="ai-sidebar"/);
   assert.match(html, /id="chat-messages"/);
+  assert.match(html, /data-ai-mode="chat" aria-pressed="false"/);
+  assert.match(html, /data-ai-mode="edit" aria-pressed="true"/);
   assert.match(renderer, /action: 'chat'/);
+  assert.match(renderer, /function setAiMode\(mode\)/);
+  assert.match(renderer, /let aiMode = 'edit'/);
+  assert.match(renderer, /setAiMode\('edit'\)/);
+  assert.match(renderer, /if \(aiMode === 'edit'\)/);
+  assert.match(renderer, /const action = selection\.text\.trim\(\) \? 'review' : 'compose'/);
+  assert.match(renderer, /Applied to the editor/);
   assert.match(renderer, /chatHistory\.push\(\{ role: 'assistant'/);
   assert.match(renderer, /const selectionAtOpen = pendingSelection \|\| currentSelection\(\)/);
   assert.match(renderer, /chatSelection = selectionAtOpen/);
@@ -183,6 +193,11 @@ test('AI settings, selection tools, and secure renderer boundary are wired', () 
   assert.match(renderer, /await requestAi\(\{ action: 'chat'/);
   assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /\.taskbar button\.ai-working::after/);
   assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /@keyframes ai-spinner/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /Shared outlined controls/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /body\.dark-mode \.taskbar button/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /Ask\/Edit is one segmented control/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /#close-ai \{ border: 0 !important/);
+  assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /Footer controls are lightweight icons/);
   assert.match(renderer, /pendingSelection = selection/);
   assert.match(renderer, /function toggleAiChat\(\)/);
   assert.match(renderer, /onMenu\('ai-compose', toggleAiChat\)/);
@@ -190,10 +205,10 @@ test('AI settings, selection tools, and secure renderer boundary are wired', () 
   assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /body\.chat-visible \.workspace/);
   assert.match(renderer, /onMenu\('ai-compose'/);
   assert.match(main, /CmdOrCtrl\+Shift\+I/);
-  assert.match(html, /placeholder="How can I help\? \(Esc to hide\)"/);
+  assert.match(html, /placeholder="Describe the edit to make… \(Esc to hide\)"/);
   assert.doesNotMatch(html, /id="run-ai"/);
   assert.match(fs.readFileSync(path.join(root, 'src/renderer/styles.css'), 'utf8'), /@keyframes ai-ring/);
-  assert.match(renderer, /aiPrompt\.placeholder = 'How can I help\? \(Esc to hide\)'/);
+  assert.match(renderer, /aiPrompt\.placeholder = aiMode === 'edit'/);
   assert.match(renderer, /event\.key === 'Escape'/);
   assert.match(renderer, /const hasSelection = selection\.text\.trim\(\)\.length > 0/);
   assert.match(renderer, /model\.getPositionAt\(startOffset \+ result\.length\)/);

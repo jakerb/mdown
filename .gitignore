@@ -9,3 +9,4 @@ npm-debug.log*
 
 # Per-user Mdown settings, which can contain an AI API key
 mdown.config.json
+changes.md
