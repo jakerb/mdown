@@ -6,6 +6,25 @@ Mdown is a focused, native-feeling Markdown editor for macOS. It pairs Monaco's 
 
 Download the current macOS installers from the [Mdown Releases page](https://github.com/jakerb/mdown/releases): choose **Apple Silicon** for M-series Macs or **Intel** for older Intel-based Macs.
 
+### First launch of release version
+
+If you download Mdown from GitHub Releases, macOS may show a warning that the app is from an unverified developer (or that Apple could not check it for malicious software).
+
+This happens because Gatekeeper applies extra checks to apps downloaded from the internet, and apps distributed outside the Mac App Store can trigger this warning when they are not notarized in a way macOS expects.
+
+To open Mdown anyway:
+
+1. In Finder, locate Mdown in Applications.
+2. Control-click (or right-click) the app and choose **Open**.
+3. Click **Open** again in the confirmation dialog.
+
+If that option does not appear:
+
+1. Try opening Mdown once so the warning appears.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the security section and click **Open Anyway** for Mdown.
+4. Confirm by clicking **Open**.
+
 ## Features
 
 - Open and edit Markdown files in dedicated windows.
